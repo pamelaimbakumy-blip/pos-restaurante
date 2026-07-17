@@ -127,6 +127,90 @@ app.delete('/pedidos/:id', (req, res) => {
         pedido: pedidoCancelado
     });
 });
+// 5.8 RUTA (PUT): Actualizar un pedido existente (Manejando stock automáticamente)
+app.put('/pedidos/:id', (req, res) => {
+    const idPedido = parseInt(req.params.id);
+    const nuevosItems = req.body.items; // La nueva lista de platos que quiere el cliente
+
+    // 1. Validaciones básicas de entrada
+    if (!nuevosItems || !Array.isArray(nuevosItems) || nuevosItems.length === 0) {
+        return res.status(400).json({ error: "Debes incluir al menos un plato en tu pedido actualizado usando un arreglo de 'items'." });
+    }
+
+    // 2. Buscar si el pedido existe
+    const pedidoOriginal = pedidos.find(p => p.id === idPedido);
+    if (!pedidoOriginal) {
+        return res.status(404).json({ error: `No se encontró ningún pedido activo con el ID ${idPedido} para actualizar.` });
+    }
+
+    // 3. DEVOLUCIÓN TEMPORAL DEL STOCK VIEJO
+    // Simulamos que el pedido viejo se cancela temporalmente para regresar los platos al menú
+    pedidoOriginal.items.forEach(idPlato => {
+        const plato = menu.find(p => p.id === idPlato);
+        if (plato) {
+            plato.stock += 1;
+        }
+    });
+
+    // 4. VERIFICAR STOCK DE LOS NUEVOS ITEMS
+    const conteoNuevos = {};
+    nuevosItems.forEach(id => {
+        conteoNuevos[id] = (conteoNuevos[id] || 0) + 1;
+    });
+
+    let stockSuficiente = true;
+    let errorMensaje = "";
+
+    for (const idPlato in conteoNuevos) {
+        const plato = menu.find(p => p.id === parseInt(idPlato));
+        if (!plato) {
+            stockSuficiente = false;
+            errorMensaje = `El producto con ID ${idPlato} no existe en el menú.`;
+            break;
+        }
+        if (plato.stock < conteoNuevos[idPlato]) {
+            stockSuficiente = false;
+            errorMensaje = `Stock insuficiente para '${plato.nombre}' al intentar actualizar. Disponible: ${plato.stock}`;
+            break;
+        }
+    }
+
+    // Si NO hay suficiente stock para los nuevos productos:
+    if (!stockSuficiente) {
+        // Deshacemos la devolución temporal (volvemos a restar lo que el cliente ya tenía)
+        pedidoOriginal.items.forEach(idPlato => {
+            const plato = menu.find(p => p.id === idPlato);
+            if (plato) {
+                plato.stock -= 1;
+            }
+        });
+        return res.status(400).json({ error: errorMensaje });
+    }
+
+    // 5. PROCESAR EL CAMBIO (Restar nuevo stock y calcular totales)
+    let nuevoTotal = 0;
+    const nuevosDetalles = [];
+
+    nuevosItems.forEach(idPlato => {
+        const platoEncontrado = menu.find(p => p.id === idPlato);
+        if (platoEncontrado) {
+            platoEncontrado.stock -= 1; // Restamos el stock del nuevo plato
+            nuevoTotal += platoEncontrado.precio;
+            nuevosDetalles.push(platoEncontrado.nombre);
+        }
+    });
+
+    // 6. ACTUALIZAR EL OBJETO DEL PEDIDO
+    pedidoOriginal.items = nuevosItems;
+    pedidoOriginal.detalle = nuevosDetalles;
+    pedidoOriginal.total = parseFloat(nuevoTotal.toFixed(2));
+    pedidoOriginal.fechaActualizacion = new Date().toLocaleString(); // Dejamos registro de cuándo se editó
+
+    res.json({
+        mensaje: `¡El pedido #${idPedido} ha sido actualizado con éxito!`,
+        pedido: pedidoOriginal
+    });
+});
 
 // 6. Encendido del servidor
 app.listen(PORT, () => {
