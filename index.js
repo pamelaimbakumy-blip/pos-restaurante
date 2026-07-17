@@ -1,6 +1,8 @@
 const express = require('express');
 const app = express();
 const PORT = 3000;
+// Este "traductor" permite que Express entienda el formato JSON que le enviemos en los pedidos
+app.use(express.json());
 
 // 1. Tu lista de platos con IDs únicos y ordenados
 const menu = [
@@ -23,6 +25,8 @@ const menu = [
     { id: 17, nombre: "Tabacos", precio: 0.30 },
     { id: 18, nombre: "Porciones extras", precio: 1.5 }
 ];
+// Aquí guardaremos los pedidos que hagan los clientes
+const pedidos = [];
 
 // 2. Ruta principal de bienvenida (HTML)
 app.get('/', (req, res) => {
@@ -32,6 +36,29 @@ app.get('/', (req, res) => {
 // 3. Envía la lista de platos en formato JSON
 app.get('/menu', (req, res) => {
     res.json(menu);
+});
+// 3.5 NUEVA RUTA (POST): Recibir un pedido nuevo
+app.post('/pedidos', (req, res) => {
+    const nuevoPedido = {
+        id: pedidos.length + 1,
+        items: req.body.items,      // Aquí vendrán los IDs de los platos que pide el cliente
+        total: req.body.total,      // El valor total de la cuenta
+        fecha: new Date().toLocaleString() // Guardamos la hora exacta del pedido
+    };
+
+    // Guardamos el pedido en nuestra lista
+    pedidos.push(nuevoPedido);
+
+    // Respondemos con un mensaje de éxito y el pedido creado
+    res.status(201).json({
+        mensaje: "¡Pedido registrado con éxito!",
+        pedido: nuevoPedido
+    });
+});
+
+// NUEVA RUTA (GET): Ver todos los pedidos acumulados
+app.get('/pedidos', (req, res) => {
+    res.json(pedidos);
 });
 
 // 4. Encendido del servidor
