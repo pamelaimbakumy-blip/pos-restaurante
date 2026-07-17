@@ -81,6 +81,30 @@ app.post('/pedidos', (req, res) => {
         pedido: nuevoPedido
     });
 });
+// 5.5 NUEVA RUTA (DELETE): Cancelar un pedido específico por su ID
+app.delete('/pedidos/:id', (req, res) => {
+    // Obtenemos el ID de la URL y lo convertimos a número entero
+    const idPedido = parseInt(req.params.id);
+    
+    // Buscamos en qué posición de nuestra lista está ese pedido
+    const posicion = pedidos.findIndex(p => p.id === idPedido);
+
+    // Si no existe un pedido con ese ID, devolvemos un error 404
+    if (posicion === -1) {
+        return res.status(404).json({ 
+            error: `No se encontró ningún pedido activo con el ID ${idPedido}.` 
+        });
+    }
+
+    // Sacamos el pedido de la lista usando splice
+    const pedidoCancelado = pedidos.splice(posicion, 1);
+
+    // Respondemos confirmando la eliminación
+    res.json({
+        mensaje: `¡El pedido #${idPedido} ha sido cancelado con éxito!`,
+        pedido: pedidoCancelado[0]
+    });
+});
 
 // 6. Encendido del servidor
 app.listen(PORT, () => {
